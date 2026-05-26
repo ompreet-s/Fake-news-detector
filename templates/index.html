@@ -1,0 +1,294 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>FakeScope — Fake News Detector</title>
+<link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;700;800&family=DM+Sans:wght@300;400;500&display=swap" rel="stylesheet"/>
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+  :root {
+    --bg: #0a0a0f; --surface: #13131a; --surface2: #1c1c26;
+    --border: rgba(255,255,255,0.07); --border2: rgba(255,255,255,0.13);
+    --text: #f0efe8; --muted: #888898; --accent: #b8f57a;
+    --danger: #f97373; --warn: #fbbf24; --radius: 14px; --radius-sm: 8px;
+  }
+  body {
+    font-family: 'DM Sans', sans-serif;
+    background: var(--bg); color: var(--text);
+    min-height: 100vh; display: flex; flex-direction: column; align-items: center;
+  }
+  header {
+    width: 100%; padding: 1.5rem 2.5rem;
+    display: flex; align-items: center; justify-content: space-between;
+    border-bottom: 0.5px solid var(--border);
+  }
+  .logo { display: flex; align-items: center; gap: 10px; }
+  .logo-icon {
+    width: 36px; height: 36px; background: var(--accent);
+    border-radius: 9px; display: flex; align-items: center; justify-content: center;
+  }
+  .logo-text { font-family: 'Syne',sans-serif; font-size: 1.2rem; font-weight: 800; }
+  .logo-text span { color: var(--accent); }
+  .badge {
+    font-size: 11px; padding: 3px 10px; border-radius: 20px;
+    background: rgba(184,245,122,0.1); color: var(--accent);
+    border: 0.5px solid rgba(184,245,122,0.3);
+  }
+  .hero { max-width: 720px; width: 100%; padding: 4rem 2rem 1.5rem; text-align: center; }
+  .hero h1 {
+    font-family: 'Syne', sans-serif; font-size: clamp(1.8rem,5vw,3rem);
+    font-weight: 800; line-height: 1.1; letter-spacing: -0.03em; margin-bottom: 1rem;
+  }
+  .hero h1 em { font-style: normal; color: var(--accent); }
+  .hero p { color: var(--muted); line-height: 1.7; max-width: 500px; margin: 0 auto 2.5rem; }
+  .main { max-width: 720px; width: 100%; padding: 0 2rem 4rem; }
+  .input-box {
+    background: var(--surface); border: 0.5px solid var(--border2);
+    border-radius: var(--radius); overflow: hidden; transition: border-color 0.2s;
+  }
+  .input-box:focus-within { border-color: rgba(184,245,122,0.4); }
+  .input-box textarea {
+    width: 100%; background: transparent; border: none; outline: none;
+    color: var(--text); font-family: 'DM Sans',sans-serif; font-size: 0.95rem;
+    line-height: 1.7; padding: 1.25rem 1.5rem 0.5rem; resize: none; min-height: 140px;
+    caret-color: var(--accent);
+  }
+  .input-box textarea::placeholder { color: var(--muted); }
+  .input-footer {
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 0.75rem 1.25rem; border-top: 0.5px solid var(--border);
+  }
+  .char-count { font-size: 12px; color: var(--muted); }
+  .analyze-btn {
+    display: flex; align-items: center; gap: 8px; padding: 9px 22px;
+    background: var(--accent); color: #0a0a0f; font-family: 'DM Sans',sans-serif;
+    font-size: 0.9rem; font-weight: 500; border: none;
+    border-radius: var(--radius-sm); cursor: pointer; transition: opacity 0.2s, transform 0.1s;
+  }
+  .analyze-btn:hover { opacity: 0.88; }
+  .analyze-btn:active { transform: scale(0.97); }
+  .analyze-btn:disabled { opacity: 0.35; cursor: not-allowed; }
+  .examples-row { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 1rem 0 1.5rem; }
+  .chip {
+    font-size: 12px; color: var(--muted);
+    border: 0.5px solid var(--border2); border-radius: 20px;
+    padding: 5px 14px; background: var(--surface); cursor: pointer;
+    transition: color 0.15s, border-color 0.15s;
+  }
+  .chip:hover { color: var(--accent); border-color: rgba(184,245,122,0.3); }
+  .result-card {
+    border-radius: var(--radius); padding: 1.75rem;
+    margin-top: 1.5rem; border: 0.5px solid;
+    animation: fadeUp 0.35s ease;
+  }
+  @keyframes fadeUp {
+    from { opacity:0; transform:translateY(12px); }
+    to { opacity:1; transform:translateY(0); }
+  }
+  .result-card.real   { background: rgba(184,245,122,0.05); border-color: rgba(184,245,122,0.25); }
+  .result-card.fake   { background: rgba(249,115,115,0.05); border-color: rgba(249,115,115,0.25); }
+  .result-card.uncertain { background: rgba(251,191,36,0.05); border-color: rgba(251,191,36,0.25); }
+  .result-header { display: flex; align-items: center; gap: 14px; margin-bottom: 1.25rem; }
+  .verdict-icon {
+    width: 46px; height: 46px; border-radius: 12px;
+    display: flex; align-items: center; justify-content: center; flex-shrink: 0;
+    font-size: 22px;
+  }
+  .real .verdict-icon   { background: rgba(184,245,122,0.15); }
+  .fake .verdict-icon   { background: rgba(249,115,115,0.15); }
+  .uncertain .verdict-icon { background: rgba(251,191,36,0.15); }
+  .verdict-tag {
+    font-size: 11px; font-weight: 600; text-transform: uppercase;
+    letter-spacing: 0.1em; margin-bottom: 3px;
+  }
+  .real .verdict-tag   { color: var(--accent); }
+  .fake .verdict-tag   { color: var(--danger); }
+  .uncertain .verdict-tag { color: var(--warn); }
+  .verdict-title { font-family: 'Syne',sans-serif; font-size: 1.25rem; font-weight: 800; }
+  .conf-row { display: flex; justify-content: space-between; margin-bottom: 6px; }
+  .conf-label { font-size: 12px; color: var(--muted); }
+  .conf-pct   { font-size: 12px; font-weight: 500; }
+  .conf-track {
+    width: 100%; height: 5px; background: rgba(255,255,255,0.07);
+    border-radius: 10px; overflow: hidden; margin-bottom: 1.25rem;
+  }
+  .conf-fill { height: 100%; border-radius: 10px; transition: width 0.7s ease; }
+  .real .conf-fill   { background: var(--accent); }
+  .fake .conf-fill   { background: var(--danger); }
+  .uncertain .conf-fill { background: var(--warn); }
+  .divider { border: none; border-top: 0.5px solid var(--border); margin: 1rem 0; }
+  .probs-row { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-top: 1rem; }
+  .prob-box {
+    background: var(--surface2); border-radius: var(--radius-sm);
+    padding: 0.9rem 1rem; text-align: center;
+  }
+  .prob-num { font-family: 'Syne',sans-serif; font-size: 1.4rem; font-weight: 800; margin-bottom: 2px; }
+  .prob-lbl { font-size: 11px; color: var(--muted); text-transform: uppercase; letter-spacing: 0.05em; }
+  .prob-real .prob-num { color: var(--accent); }
+  .prob-fake .prob-num { color: var(--danger); }
+  .loading-state {
+    display: flex; flex-direction: column; align-items: center; gap: 1rem;
+    padding: 2.5rem; background: var(--surface);
+    border: 0.5px solid var(--border); border-radius: var(--radius);
+    margin-top: 1.5rem; animation: fadeUp 0.3s ease;
+  }
+  .spinner {
+    width: 30px; height: 30px;
+    border: 2px solid rgba(255,255,255,0.07);
+    border-top-color: var(--accent); border-radius: 50%;
+    animation: spin 0.7s linear infinite;
+  }
+  @keyframes spin { to { transform: rotate(360deg); } }
+  .loading-text { font-size: 0.88rem; color: var(--muted); }
+  .stats-row { display: grid; grid-template-columns: repeat(3,1fr); gap: 10px; margin-top: 2rem; }
+  .stat-card {
+    background: var(--surface); border: 0.5px solid var(--border);
+    border-radius: var(--radius-sm); padding: 1rem; text-align: center;
+  }
+  .stat-num { font-family:'Syne',sans-serif; font-size:1.4rem; font-weight:800; color:var(--accent); margin-bottom:3px; }
+  .stat-lbl { font-size:11px; color:var(--muted); text-transform:uppercase; letter-spacing:0.05em; }
+  footer {
+    width: 100%; text-align: center; padding: 1.5rem;
+    font-size: 12px; color: var(--muted); border-top: 0.5px solid var(--border); margin-top: auto;
+  }
+</style>
+</head>
+<body>
+
+<header>
+  <div class="logo">
+    <div class="logo-icon">🔍</div>
+    <div class="logo-text">Fake<span>Scope</span></div>
+  </div>
+  <div class="badge">Gradient Boosting Model</div>
+</header>
+
+<div class="hero">
+  <h1>Detect <em>misinformation</em><br>before it spreads</h1>
+  <p>Paste any news headline or article. Our trained Gradient Boosting model analyzes it instantly.</p>
+</div>
+
+<div class="main">
+  <div class="input-box">
+    <textarea id="newsInput" placeholder="Paste a news headline or article excerpt here…" oninput="updateCount()"></textarea>
+    <div class="input-footer">
+      <span class="char-count" id="charCount">0 characters</span>
+      <button class="analyze-btn" id="analyzeBtn" onclick="analyze()" disabled>🔍 Analyze</button>
+    </div>
+  </div>
+
+  <div class="examples-row" style="margin-top:1rem;">
+    <div class="chip" onclick="loadExample(0)">📰 Real news example</div>
+    <div class="chip" onclick="loadExample(1)">⚠️ Fake news example</div>
+  </div>
+
+  <div id="resultArea"></div>
+
+  <div class="stats-row">
+    <div class="stat-card"><div class="stat-num">98%</div><div class="stat-lbl">Accuracy</div></div>
+    <div class="stat-card"><div class="stat-num">44K+</div><div class="stat-lbl">Articles trained</div></div>
+    <div class="stat-card"><div class="stat-num">&lt;1s</div><div class="stat-lbl">Analysis time</div></div>
+  </div>
+</div>
+
+<footer>FakeScope · Built with Gradient Boosting · For educational purposes</footer>
+
+<script>
+const examples = [
+  "Scientists at NASA confirm the Mars rover Perseverance has successfully collected rock samples that will be returned to Earth for analysis, potentially revealing signs of ancient microbial life.",
+  "BREAKING: Government caught putting microchips in vaccines to track citizens! A whistleblower nurse CONFIRMED it. Big Pharma doesn't want you to know this. Share before it's deleted!!!"
+];
+
+const textarea = document.getElementById('newsInput');
+
+function updateCount() {
+  const len = textarea.value.trim().length;
+  document.getElementById('charCount').textContent = len + ' characters';
+  document.getElementById('analyzeBtn').disabled = len < 20;
+}
+
+function loadExample(i) {
+  textarea.value = examples[i];
+  updateCount();
+}
+
+async function analyze() {
+  const text = textarea.value.trim();
+  if (!text) return;
+
+  const resultArea = document.getElementById('resultArea');
+  resultArea.innerHTML = `
+    <div class="loading-state">
+      <div class="spinner"></div>
+      <div class="loading-text">Analyzing with Gradient Boosting model…</div>
+    </div>`;
+  document.getElementById('analyzeBtn').disabled = true;
+
+  try {
+    const response = await fetch('/predict', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ text })
+    });
+
+    const data = await response.json();
+    if (data.error) throw new Error(data.error);
+
+    const cls = data.verdict.toLowerCase();
+    const icons = { real: '✅', fake: '🚫', uncertain: '⚠️' };
+    const titles = {
+      real: 'Likely Credible News',
+      fake: 'Likely Fake News',
+      uncertain: 'Cannot Determine'
+    };
+
+    resultArea.innerHTML = `
+      <div class="result-card ${cls}">
+        <div class="result-header">
+          <div class="verdict-icon">${icons[cls] || '❓'}</div>
+          <div>
+            <div class="verdict-tag">${data.verdict}</div>
+            <div class="verdict-title">${titles[cls] || ''}</div>
+          </div>
+        </div>
+
+        <div class="conf-row">
+          <span class="conf-label">Model Confidence</span>
+          <span class="conf-pct">${data.confidence}%</span>
+        </div>
+        <div class="conf-track">
+          <div class="conf-fill" style="width: ${data.confidence}%"></div>
+        </div>
+
+        <hr class="divider"/>
+
+        <div class="probs-row">
+          <div class="prob-box prob-real">
+            <div class="prob-num">${data.real_prob}%</div>
+            <div class="prob-lbl">Real probability</div>
+          </div>
+          <div class="prob-box prob-fake">
+            <div class="prob-num">${data.fake_prob}%</div>
+            <div class="prob-lbl">Fake probability</div>
+          </div>
+        </div>
+      </div>`;
+  } catch (err) {
+    resultArea.innerHTML = `
+      <div class="result-card uncertain">
+        <div class="result-header">
+          <div class="verdict-icon">⚠️</div>
+          <div>
+            <div class="verdict-tag">Error</div>
+            <div class="verdict-title">Analysis failed — ${err.message}</div>
+          </div>
+        </div>
+      </div>`;
+  } finally {
+    document.getElementById('analyzeBtn').disabled = false;
+  }
+}
+</script>
+</body>
+</html>
